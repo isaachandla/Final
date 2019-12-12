@@ -1,30 +1,239 @@
 ---
-title: "Final-Quarterly Analysis"
-author: "IC"
+title: "CSR Quarterly Engagement Analysis"
+author: "iwc95"
 date: "12/11/2019"
 output: html_document
 ---
-#Final Project
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown Here
+## Synopsis
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+This document will explain the methodology for the quarterly analysis for the engagements of Dell's CSR team. This team is responsible for ensuring that regulatory, procurement, and environmental needs are met through Dell's corporate office. Each quarter, a number of Request for Proposals (RFPs), Customer Engagements (CE), and Other items are tracked. Further, each of these engagements falls under a certain category and pertains to a variety of predisposed tags associated with that category. In this report, I will walk through this algorithm and provide meaningful analysis and data visualization for the CSR tracker. 
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+# Getting data into R
+
+First, the tracker will need to be downloaded from the CDR OneDrive. Once the latest version has been dowloaded, open in excel and ensure that the data is clean and ready for analysis in R. Once that's done, load the necessary packages you will need in R and load in the tracker.
 
 ```{r cars}
-summary(cars)
+library(tidyverse)
+library(tidytext)
+library(readxl)
+library(openxlsx)
+library(stringr)
+library(readr)
+
+d <- "trackerdata2.xlsx" ##Import the tracker data, as updated as possible
+tracker <- read_excel(d,sheet = 1, col_names = TRUE)
+head(tracker)
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+The tracker is now loaded in with 3237 observations and 18 variables. This means that though 2014 to Q3 of FY20, there were 3,237 entries. While 18 variables explains how many columns are in the original tracker. You can refine the tracker  by filtering only the columns that are of interest in this anlysis:
+
+
+
+
+``` {r}
+##Refine to make data more manageable
+refine_tracker <- select(tracker, Name_of_Customer, Region, Form, Category, Date_Received, Escalation, Tags)
+
+head(refine_tracker)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+This makes the data more manageable, as these are the variables that we are interested in. Tags is not important until the data mining section, which is last.
+
+# Setting time frames
+
+Next, it is important that the analysis is being done for the time frame that is requested. Usually, it is a quarter to quarter analysis, however, lately, a full analysis of a fiscal year (2-1-XX, 1-31-XX) has been requested. Filtering the Date receieved column allows this parsing to take place:
+
+```{r}
+
+y19 <- filter(refine_tracker, Date_Received >= "2019-02-01" & Date_Received <= "2020-01-31")
+
+y19q1 <- filter(refine_tracker, Date_Received >= "2019-02-01" & Date_Received <= "2019-04-30")
+y19q2 <- filter(refine_tracker, Date_Received >= "2019-05-01" & Date_Received <= "2019-07-31")
+y19q3 <- filter(refine_tracker, Date_Received >= "2019-08-01" & Date_Received <= "2019-10-31")
+y19q4 <- filter(refine_tracker, Date_Received >= "2019-11-01" & Date_Received <= "2020-01-31")
+
+```
+
+As the years and quarter changes, modification to the above code may need altered. Parsing the data this way allows one to do an analysis for just one of the quarters, as well as for the year-to-date fiscal year results.
+
+
+# Components of Tracker
+
+There are three components to the tracker, RFPs, Customer Engagements, and Other (usually Awards or 'Wins'). All of these are tracked together in the CSR tracker, however, each have a different intepretation for what kind of engagement took place. For this reason, the RFPs will be analyzed seperately, followed by the CEs, and finally Other will be looked at. Typically, RFPs comprise most of the entries, while CEs are only a portion of the tracked items. For this report, FY20 data is incomplete, as only quarter 1-3 have taken place. The year can be adjusted by changing the dates as well as the name for the time-parsed datas.  
+
+```{r}
+RFPs <- filter(y19, Form == "Questionnaire" | Form == "Individual Question" | Form == "Document Review" | Form == "EICC/GeSI CM Template")
+CE <- filter(y19, Form == "Customer Engagement")
+Other <- filter(y19, Form == "Other")
+
+RFPs1 <- filter(y19q1, Form == "Questionnaire" | Form == "Individual Question" | Form == "Document Review" | Form == "EICC/GeSI CM Template")
+CE1 <- filter(y19q1, Form == "Customer Engagement")
+Other1 <- filter(y19q1, Form == "Other")
+
+RFPs2 <- filter(y19q2, Form == "Questionnaire" | Form == "Individual Question" | Form == "Document Review" | Form == "EICC/GeSI CM Template")
+CE2 <- filter(y19q2, Form == "Customer Engagement")
+Other2 <- filter(y19q2, Form == "Other")
+
+RFPs3 <- filter(y19q3, Form == "Questionnaire" | Form == "Individual Question" | Form == "Document Review" | Form == "EICC/GeSI CM Template")
+CE3 <- filter(y19q3, Form == "Customer Engagement")
+Other3 <- filter(y19q3, Form == "Other")
+
+RFPs4 <- filter(y19q4, Form == "Questionnaire" | Form == "Individual Question" | Form == "Document Review" | Form == "EICC/GeSI CM Template")
+CE4 <- filter(y19q4, Form == "Customer Engagement")
+Other4 <- filter(y19q4, Form == "Other")
+```
+
+From these seperations, we can do a further analysis of the category for each the RFPs, CEs, and Others. For this report, Q3 RFPs will be used as an example. However, this can be done for the whole fiscal year, as well as for each quarter by changing the data used. 
+
+# RFP Analysis
+
+## RFP Category Analsis
+
+```{r}
+Category_RFPs <- group_by(RFPs3, Category) %>% summarize(count = n()) %>% arrange(desc(count))
+Category_RFPs ##gives Category count of RFPs
+RFP_analysis <- Category_RFPs %>% mutate(percentage = count/sum(count)*100) ##adds percentage column to Category_RFPs
+RFP_analysis 
+```
+
+The above line of code will give a count and percentage of the RFPs for Q3. We can create a simple bar graph by:
+
+```{r}
+Category_RFPs %>% ggplot() +
+  geom_col(aes(x = Category, y = count)) +
+  theme(axis.text.x = element_text(angle = 90)) +
+  ggtitle("Q3")##creates bar graph for Category RFPs
+
+```
+
+Each quarter can be graphed by simply changing the data used to create the bargraph.
+
+
+
+## RFP Regional Analysis
+
+Same goes for the regional analysis:
+
+```{r}
+
+Region_RFPs <- group_by(RFPs3, Region) %>% summarize(count=n()) %>% arrange(desc(count))
+Region_RFPs ## gives Region count of RFPs
+Region_RFPs %>% mutate(percentage = count/sum(count)*100) ##adds %
+
+Region_RFPs %>% ggplot() +
+  geom_col(aes(x = Region, y = count)) +
+  theme(axis.text.x = element_text(angle = 90)) +
+  ggtitle("Q3")##creates bar graph for Category RFPs
+
+```
+
+
+## RFP Escalation Analysis (RFP only)
+
+Escalations are for RFPs only, and designates what kind of oversight the RFP had during the engagement. (1 = Student contracters, 2 = Subject Matter Experts, 3 = Head of department, 4 = Account Executive)
+
+```{r} 
+
+Escalation_RFPs <- group_by(RFPs3, Escalation) %>% summarize(count=n()) %>% arrange(desc(count))
+Escalation_RFPs ##gives Escalation count of RFPs
+
+```
+
+# Text Mining
+
+```{r}
+taglist <- "Book2.xlsx"
+listtags <- read_excel(taglist, col_names = TRUE)
+listtags$Tags<-tolower(listtags$Tags)
+RFPs3$Tags<-tolower(RFPs3$Tags)
+
+tags <- c(listtags)
+tags
+
+GenCSR <- filter(RFPs3, Category == "General CSR") %>%
+  select(Tags)
+GenCSR <- c(GenCSR)
+GenCSR <- as.data.frame(GenCSR)
+GCSRtagcount <- sapply(GenCSR, function(x) {
+  sapply(tags[["Tags"]], function(y) {
+    sum(grepl(y,x))
+  })
+}) 
+
+
+AccountGov <- filter(RFPs3, Category == "Accountability / Governance") %>%
+  select(Tags)
+AG <- c(AccountGov)
+AG <- as.data.frame(AG)
+AGtagcount <- sapply(AG, function(x) {
+  sapply(tags[["Tags"]], function(y) {
+    sum(grepl(y,x))
+  })
+})
+AGtagcount
+
+Enviro <- filter(RFPs3, Category == "Environment")%>%
+  select(Tags)
+EV <- c(Enviro)
+EV <- as.data.frame(EV)
+EVtagcount <- sapply(EV, function(x) {
+  sapply(tags[["Tags"]], function (y) {
+    sum(grepl(y, x))
+  })
+})
+EVtagcount
+
+RespMfr <- filter(RFPs, Category == "Responsible Sourcing & Mfr")%>%
+  select(Tags)
+RMfr <- c(RespMfr)
+RMfr <- as.data.frame(RMfr)
+RMfrtagcount <- sapply(RMfr, function(x) {
+  sapply(tags[["Tags"]], function(y) {
+    sum(grepl(y,x))
+  })
+})
+RMfrtagcount
+
+Repor <- filter(RFPs, Category == "Reporting")%>%
+  select(Tags) %>%
+  c() %>% 
+  as.data.frame() 
+Reportagcount <- sapply(Repor, function(x) {
+  sapply(tags[["Tags"]], function(y) {
+    sum(grepl(y,x))
+  })
+})
+Reportagcount
+
+DandI <- filter(RFPs, Category == "Diversity / Inclusion") %>%
+  select(Tags) %>%
+  c() %>%
+  as.data.frame()
+DandItagcount <- sapply(Repor, function(x) {
+  sapply(tags[["Tags"]], function(y) {
+    sum(grepl(y,x))
+  })
+})
+DandItagcount
+```
+
+Each category should be scrubbed for the tags that are most relevent. Once the counts have been aranged, export data into an excel sheet for further analysis and graph making. 
+
+## creates a new excel sheet with the tags in their each new sheet
+```{r}
+list_of_tags <- list("GenCSRtags" = GCSRtagcount,"Envtags" = EVtagcount, "AGtags" = AGtagcount, "RMtags" = RMfrtagcount, "Rtags" = Reportagcount, "RFPanalysis" = RFP_analysis)
+write.xlsx(list_of_tags, file = "q3TAGdata.xlsx")
+
+```
+
+
+Done!
+
